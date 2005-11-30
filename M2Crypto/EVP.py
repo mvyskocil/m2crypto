@@ -6,9 +6,9 @@ Portions Copyright (c) 2004 Open Source Applications Foundation.
 Author: Heikki Toivonen
 """
 
-RCS_id='$Id: EVP.py,v 1.10 2004/04/12 02:04:19 ngps Exp $'
+RCS_id='$Id$'
 
-import Err, util
+from M2Crypto import Err, util, BIO
 import m2
 
 class MessageDigest:
@@ -246,12 +246,10 @@ class PKey:
         if cipher is None:
             return m2.pkey_write_pem_no_cipher(self.pkey, bio._ptr(), callback)
         else:
-            ciph = getattr(m2, cipher, None)
-            if ciph is None:
-                raise EVPError, 'not such cipher %s' % cipher
-            else:
-                ciph = ciph()
-            return m2.pkey_write_pem(self.pkey, bio._ptr(), ciph, callback)
+            proto = getattr(m2, cipher, None)
+            if proto is None:
+                raise ValueError, 'no such cipher %s' % cipher
+            return m2.pkey_write_pem(self.pkey, bio._ptr(), proto(), callback)
 
     def as_pem(self, cipher='aes_128_cbc', callback=util.passphrase_callback):
         """

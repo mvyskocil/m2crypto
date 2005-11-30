@@ -1,9 +1,10 @@
+/* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /* Copyright (c) 1999-2004 Ng Pheng Siong. All rights reserved.  */
 /*
 ** Portions created by Open Source Applications Foundation (OSAF) are
-** Copyright (C) 2004 OSAF. All Rights Reserved.
+** Copyright (C) 2004-2005 OSAF. All Rights Reserved.
 */
-/* $Id: _x509.i,v 1.3 2004/04/09 16:30:48 ngps Exp $   */
+/* $Id$   */
 
 %{
 #include <openssl/x509.h>
@@ -35,6 +36,40 @@
 %name(x509_get_subject_name) extern X509_NAME *X509_get_subject_name(X509 *);
 %name(x509_set_subject_name) extern int X509_set_subject_name(X509 *, X509_NAME *);
 
+/* From x509.h */
+/* standard trust ids */
+%constant int X509_TRUST_DEFAULT      = -1;
+%constant int X509_TRUST_COMPAT       = 1;
+%constant int X509_TRUST_SSL_CLIENT   = 2;
+%constant int X509_TRUST_SSL_SERVER   = 3;
+%constant int X509_TRUST_EMAIL        = 4;
+%constant int X509_TRUST_OBJECT_SIGN  = 5;
+%constant int X509_TRUST_OCSP_SIGN    = 6;
+%constant int X509_TRUST_OCSP_REQUEST = 7;
+
+/* trust_flags values */
+%constant int X509_TRUST_DYNAMIC      = 1;
+%constant int X509_TRUST_DYNAMIC_NAME = 2;
+
+/* check_trust return codes */
+%constant int X509_TRUST_TRUSTED      = 1;
+%constant int X509_TRUST_REJECTED     = 2;
+%constant int X509_TRUST_UNTRUSTED    = 3;
+
+/* From x509v3.h */
+%constant int X509_PURPOSE_SSL_CLIENT         = 1;
+%constant int X509_PURPOSE_SSL_SERVER         = 2;
+%constant int X509_PURPOSE_NS_SSL_SERVER      = 3;
+%constant int X509_PURPOSE_SMIME_SIGN         = 4;
+%constant int X509_PURPOSE_SMIME_ENCRYPT      = 5;
+%constant int X509_PURPOSE_CRL_SIGN           = 6;
+%constant int X509_PURPOSE_ANY                = 7;
+%constant int X509_PURPOSE_OCSP_HELPER        = 8;
+
+/*%name(x509_check_ca) extern int X509_check_ca(X509 *);*/
+%name(x509_check_purpose) extern X509_check_purpose(X509 *, int, int);
+%name(x509_check_trust) extern X509_check_trust(X509 *, int, int);
+
 %name(x509_write_pem) extern int PEM_write_bio_X509(BIO *, X509 *);
 %name(x509_write_pem_file) extern int PEM_write_X509(FILE *, X509 *);
 
@@ -62,7 +97,7 @@
 %name(x509_name_entry_free) extern void X509_NAME_ENTRY_free( X509_NAME_ENTRY *);
 %name(x509_name_entry_create_by_nid) extern X509_NAME_ENTRY *X509_NAME_ENTRY_create_by_NID( X509_NAME_ENTRY **, int, int, unsigned char *, int);
 %name(x509_name_entry_set_object) extern int X509_NAME_ENTRY_set_object( X509_NAME_ENTRY *, ASN1_OBJECT *);
-%name(x509_name_entry_set_data) extern int X509_NAME_ENTRY_set_data( X509_NAME_ENTRY *, int, unsigned char *, int);
+%name(x509_name_entry_set_data) extern int X509_NAME_ENTRY_set_data( X509_NAME_ENTRY *, int, CONST unsigned char *, int);
 %name(x509_name_entry_get_object) extern ASN1_OBJECT *X509_NAME_ENTRY_get_object(X509_NAME_ENTRY *);
 %name(x509_name_entry_get_data) extern ASN1_STRING *X509_NAME_ENTRY_get_data(X509_NAME_ENTRY *);
 
@@ -82,6 +117,11 @@
 %name(x509_store_new) extern X509_STORE *X509_STORE_new(void);
 %name(x509_store_free) extern void X509_STORE_free(X509_STORE *);
 %name(x509_store_add_cert) extern int X509_STORE_add_cert(X509_STORE *, X509 *);
+
+%name(x509_store_ctx_get_current_cert) extern X509 *X509_STORE_CTX_get_current_cert(X509_STORE_CTX *);
+%name(x509_store_ctx_get_error) extern int X509_STORE_CTX_get_error(X509_STORE_CTX *);
+%name(x509_store_ctx_get_error_depth) extern int X509_STORE_CTX_get_error_depth(X509_STORE_CTX *);
+%name(x509_store_ctx_free) extern void X509_STORE_CTX_free(X509_STORE_CTX *);
 
 %name(x509_extension_get_critical) extern int X509_EXTENSION_get_critical(X509_EXTENSION *);
 %name(x509_extension_set_critical) extern int X509_EXTENSION_set_critical(X509_EXTENSION *, int);
@@ -270,16 +310,6 @@ int x509_req_add_extensions(X509_REQ *req, STACK *exts) {
     return X509_REQ_add_extensions(req, (STACK_OF(X509_EXTENSION) *)exts);
 }
 
-/* These two are %name'd above.
-int x509_req_sign(X509_REQ *x, EVP_PKEY *pkey, EVP_MD *md) {
-    return X509_REQ_sign(x, pkey, md);
-}
-
-int x509_req_verify(X509_REQ *x, EVP_PKEY *pkey) {
-    return X509_REQ_verify(x, pkey);
-}
-*/
-
 X509_NAME_ENTRY *x509_name_entry_create_by_txt( X509_NAME_ENTRY **ne, char *field, int type, unsigned char *bytes, int len) {
 	return X509_NAME_ENTRY_create_by_txt( ne, field, type, bytes, len);
 }
@@ -326,6 +356,12 @@ int sk_x509_extension_num(STACK *stack) {
 X509_EXTENSION *sk_x509_extension_value(STACK *stack, int i) {
     return sk_X509_EXTENSION_value((STACK_OF(X509_EXTENSION) *)stack, i);
 }
+
+/* X509_STORE_CTX_get_app_data is a macro. */
+void *x509_store_ctx_get_app_data(X509_STORE_CTX *ctx) {
+  return X509_STORE_CTX_get_app_data(ctx);
+}
+
 %}
 
 /* Free malloc'ed return value for x509_name_oneline */

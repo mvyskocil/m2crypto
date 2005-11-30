@@ -2,7 +2,7 @@
 
 Copyright (c) 1999-2004 Ng Pheng Siong. All rights reserved."""
 
-RCS_id='$Id: RSA.py,v 1.9 2004/04/12 02:05:14 ngps Exp $'
+RCS_id='$Id$'
 
 import sys
 import util, BIO, Err, m2
@@ -110,6 +110,16 @@ class RSA:
         """
         bio = BIO.openfile(file, 'wb')
         return self.save_key_bio(bio, cipher, callback)
+
+    save_pem = save_key
+
+    def as_pem(self, cipher='aes_128_cbc', callback=util.passphrase_callback):
+        """
+        Returns the key(pair) as a string in PEM format.
+        """
+        bio = BIO.MemoryBuffer()
+        self.save_key_bio(bio, cipher, callback)
+        return bio.read()
 
     def save_key_der_bio(self, bio):
         """

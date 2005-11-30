@@ -4,13 +4,39 @@
 Distutils installer for M2Crypto.
 
 Copyright (c) 1999-2004, Ng Pheng Siong. All rights reserved.
+
+Portions created by Open Source Applications Foundation (OSAF) are
+Copyright (C) 2004-2005 OSAF. All Rights Reserved.
 """
 
-_RCS_id = '$Id: setup.py,v 1.13 2004/03/28 11:30:01 ngps Exp $'
+_RCS_id = '$Id$'
 
-import os, shutil, sys
+import os, sys
 from distutils.core import setup, Extension
 from distutils.command import build_ext
+
+my_inc = os.path.join(os.getcwd(), 'SWIG')
+
+if os.name == 'nt':
+    openssl_dir = 'c:\\pkg\\openssl'
+    include_dirs = [my_inc, openssl_dir + '/include']
+    swig_opts_str = '-I"' + openssl_dir + os.sep + 'include"'
+    library_dirs = [openssl_dir + '\\lib']
+    libraries = ['ssleay32', 'libeay32']
+    
+elif os.name == 'posix':
+    include_dirs = [my_inc, '/usr/include']
+    swig_opts_str = '-I/usr/include'
+    library_dirs = ['/usr/lib']
+    if sys.platform == 'cygwin':
+        # Cygwin SHOULD work (there's code in distutils), but
+        # if one first starts a Windows command prompt, then bash,
+        # the distutils code does not seem to work. If you start
+        # Cygwin directly, then it would work even without this change.
+        # Someday distutils will be fixed and this won't be needed.
+        library_dirs += ['/usr/bin']
+    libraries = ['ssl', 'crypto']
+
 
 if sys.version_info < (2,4):
 
@@ -55,6 +81,8 @@ if sys.version_info < (2,4):
         if self.swig_cpp:
             swig_cmd.append("-c++")
 
+        swig_cmd.append(swig_opts_str)
+
         for source in swig_sources:
             target = swig_targets[source]
             self.announce("swigging %s to %s" % (source, target))
@@ -64,31 +92,19 @@ if sys.version_info < (2,4):
 
     build_ext.build_ext.swig_sources = swig_sources
 
-my_inc = os.path.join(os.getcwd(), 'SWIG')
-
-if os.name == 'nt':
-    openssl_dir = 'c:\\pkg\\openssl'
-    include_dirs = [my_inc, openssl_dir + '/include']
-    library_dirs = [openssl_dir + '\\lib']
-    libraries = ['ssleay32', 'libeay32']
-    extra_compile_args = [ "-DTHREADING" ]
-
-elif os.name == 'posix':
-    include_dirs = [my_inc, '/usr/include']
-    library_dirs = ['/usr/lib']
-    libraries = ['ssl', 'crypto']
-    extra_compile_args = [ "-DTHREADING" ]
 
 m2crypto = Extension(name = '__m2crypto',
                      sources = ['SWIG/_m2crypto.i'],
                      include_dirs = include_dirs,
                      library_dirs = library_dirs,
                      libraries = libraries,
-                     extra_compile_args = extra_compile_args
+                     extra_compile_args = ['-DTHREADING', 
+                                           '-DSWIG_COBJECT_PYTHON'],
+                     swig_opts = [swig_opts_str]
                      )
 
 setup(name = 'M2Crypto',
-    version = '0.13',
+    version = '0.15',
     description = 'M2Crypto: A Python crypto and SSL toolkit',
     author = 'Ng Pheng Siong',
     author_email = 'ngps@netmemetic.com',

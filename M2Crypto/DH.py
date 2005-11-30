@@ -2,7 +2,7 @@
 
 Copyright (c) 1999-2003 Ng Pheng Siong. All rights reserved."""
 
-RCS_id='$Id: DH.py,v 1.4 2002/12/23 03:50:38 ngps Exp $'
+RCS_id='$Id$'
 
 from util import genparam_callback
 import BIO, Err, m2
@@ -49,6 +49,9 @@ class DH:
             raise DHError, 'generate (pub, priv) via gen_key()'
         else:
             self.__dict__[name] = value
+
+    def _ptr(self):
+        return self.dh
 
     def check_params(self):
         assert m2.dh_type_check(self.dh), "'dh' type error"

@@ -1,14 +1,17 @@
 #!/usr/bin/env python
 
-RCS_id = '$Id: alltests.py,v 1.4 2003/05/11 16:17:25 ngps Exp $'
+RCS_id = '$Id$'
 
 import os, unittest
 from M2Crypto import Rand
 
 def suite():
-    modules_to_test = ['test_bio_membuf',
+    modules_to_test = [
+        'test_asn1',
+        'test_bio_membuf',
         'test_bio_file',
         'test_bio_iobuf',
+        'test_bn',
         'test_authcookie',
         'test_dh',
         'test_dsa',

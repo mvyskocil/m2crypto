@@ -1,5 +1,5 @@
 /* Copyright (c) 1999-2000 Ng Pheng Siong. All rights reserved. */
-/* $Id: _dsa.i,v 1.1 2003/06/22 17:30:52 ngps Exp $ */
+/* $Id$ */
 
 %{
 #include <openssl/bn.h>
@@ -273,10 +273,12 @@ int dsa_verify(DSA *dsa, PyObject *value, PyObject *r, PyObject *s) {
     }
     if (!(sig->r = BN_mpi2bn((unsigned char *)rbuf, rlen, NULL))) {
         PyErr_SetString(_dsa_err, ERR_reason_error_string(ERR_get_error()));
+        DSA_SIG_free(sig);
         return -1;
     }
     if (!(sig->s = BN_mpi2bn((unsigned char *)sbuf, slen, NULL))) {
         PyErr_SetString(_dsa_err, ERR_reason_error_string(ERR_get_error()));
+        DSA_SIG_free(sig);
         return -1;
     }
     ret = DSA_do_verify(vbuf, vlen, sig, dsa);
@@ -336,9 +338,11 @@ PyObject *dsa_sign_asn1(DSA *dsa, PyObject *value) {
     }
     if (!DSA_sign(0, vbuf, vlen, (unsigned char *)sigbuf, &siglen, dsa)) {
         PyErr_SetString(_dsa_err, ERR_reason_error_string(ERR_get_error()));
+        PyMem_Free(sigbuf);
         return NULL;
     }
     ret = PyString_FromStringAndSize(sigbuf, siglen);
+    PyMem_Free(sigbuf);
     return ret;
 }
 

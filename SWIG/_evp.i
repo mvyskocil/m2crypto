@@ -5,13 +5,14 @@ Copyright (c) 1999 Ng Pheng Siong. All rights reserved.
 Portions Copyright (c) 2004 Open Source Applications Foundation.
 Author: Heikki Toivonen
 */
-/* $Id: _evp.i,v 1.6 2004/06/30 07:49:41 ngps Exp $ */
+/* $Id$ */
 
 %{
 #include <assert.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
+#include <openssl/rsa.h>
 %}
 
 %apply Pointer NONNULL { EVP_MD_CTX * };
@@ -20,6 +21,7 @@ Author: Heikki Toivonen
 %apply Pointer NONNULL { HMAC_CTX * };
 %apply Pointer NONNULL { EVP_CIPHER_CTX * };
 %apply Pointer NONNULL { EVP_CIPHER * };
+%apply Pointer NONNULL { RSA * };
 
 %name(md5) extern const EVP_MD *EVP_md5(void);
 %name(sha1) extern const EVP_MD *EVP_sha1(void);
@@ -75,8 +77,9 @@ Author: Heikki Toivonen
 
 %name(pkey_new) extern EVP_PKEY *EVP_PKEY_new(void);
 %name(pkey_free) extern void EVP_PKEY_free(EVP_PKEY *);
-%name(pkey_assign) extern int EVP_PKEY_assign(EVP_PKEY *pkey, int type, char *key);
-%name(pkey_set1_rsa) extern int EVP_PKEY_set1_RSA(EVP_PKEY *pkey, RSA *key);
+%name(pkey_assign) extern int EVP_PKEY_assign(EVP_PKEY *, int, char *);
+%name(pkey_set1_rsa) extern int EVP_PKEY_set1_RSA(EVP_PKEY *, RSA *);
+%name(pkey_get1_rsa) extern RSA* EVP_PKEY_get1_RSA(EVP_PKEY *);
 %name(sign_init) extern int EVP_SignInit(EVP_MD_CTX *, const EVP_MD *);
 %name(verify_init) extern int EVP_VerifyInit(EVP_MD_CTX *, const EVP_MD *);
 
@@ -417,7 +420,6 @@ PyObject *verify_update(EVP_MD_CTX *ctx, PyObject *blob) {
 int verify_final(EVP_MD_CTX *ctx, PyObject *blob, EVP_PKEY *pkey) {
     unsigned char *kbuf; 
     int len;
-    unsigned int ret;
 
 #if PYTHON_API_VERSION >= 1009
     if (PyObject_AsReadBuffer(blob, (const void **)&kbuf, &len) == -1)
@@ -438,6 +440,16 @@ int pkey_write_pem_no_cipher(EVP_PKEY *pkey, BIO *f, PyObject *pyfunc) {
 
     Py_INCREF(pyfunc);
     ret = PEM_write_bio_PrivateKey(f, pkey, NULL, NULL, 0,
+            passphrase_callback, (void *)pyfunc);
+    Py_DECREF(pyfunc);
+    return ret;
+}
+
+int pkey_write_pem(EVP_PKEY *pkey, BIO *f, EVP_CIPHER *cipher, PyObject *pyfunc) {
+    int ret;
+
+    Py_INCREF(pyfunc);
+    ret = PEM_write_bio_PrivateKey(f, pkey, cipher, NULL, 0,
             passphrase_callback, (void *)pyfunc);
     Py_DECREF(pyfunc);
     return ret;

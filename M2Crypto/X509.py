@@ -3,14 +3,14 @@
 Copyright (c) 1999-2004 Ng Pheng Siong. All rights reserved.
 
 Portions created by Open Source Applications Foundation (OSAF) are
-Copyright (C) 2004 OSAF. All Rights Reserved.
+Copyright (C) 2004-2005 OSAF. All Rights Reserved.
 Author: Heikki Toivonen
 """
 
-RCS_id='$Id: X509.py,v 1.15 2004/06/30 07:47:11 ngps Exp $'
+RCS_id='$Id$'
 
 # M2Crypto
-import ASN1, BIO, Err
+from M2Crypto import ASN1, BIO, Err, EVP
 import m2
 
 class X509Error(Exception): pass
@@ -123,10 +123,15 @@ class X509_Extension_Stack:
     def pop(self):
         """
         Pop X509_Extension object from the stack.
+        
+        @return: X509_Extension popped
         """
-        # XXX ngps: Doesn't look right. What gets returned?
-        x509__ext_ptr = m2.sk_x509_extension_pop(self.stack)
+        # XXX This method does not yet work. See also X509_Stack.
+        if m2.sk_x509_extension_num(self.stack) <= 0:
+            return None
+        x509_ext_ptr = m2.sk_x509_extension_pop(self.stack)
         del self._refkeeper[x509_ext_ptr]
+        return X509_Extension(x509_ext_ptr)
 
 
 class X509_Name_Entry:
@@ -230,13 +235,6 @@ class X509_Name:
         m2.x509_name_print(buf.bio_ptr(), self.x509_name, 0)
         return buf.read_all()
 
-    #def Print(self):
-    # XXX What's the difference between this and as_text?
-    #    assert m2.x509_name_type_check(self.x509_name), "'x509_name' type error"
-    #    buf = BIO.MemoryBuffer()
-    #    m2.x509_name_print( buf.bio_ptr(), self.x509_name )
-    #    return buf.read_all()
-
 
 class X509:
     """
@@ -279,6 +277,13 @@ class X509:
         m2.x509_write_pem(buf.bio_ptr(), self.x509)
         return buf.read_all()
 
+    def save_pem(self, filename):
+        """
+        save_pem
+        """
+        bio=BIO.openfile(filename, 'wb')
+        return m2.x509_write_pem(bio.bio_ptr(), self.x509)
+
     def set_version(self, version):
         """
         Set version.
@@ -291,25 +296,21 @@ class X509:
         assert m2.x509_type_check(self.x509), "'x509' type error"
         return m2.x509_set_version(self.x509, version)
 
-    def set_not_before(self, timeptr):
+    def set_not_before(self, asn1_utctime):
         assert m2.x509_type_check(self.x509), "'x509' type error"
-        return m2.x509_set_not_before(self.x509, timeptr )
+        return m2.x509_set_not_before(self.x509, asn1_utctime._ptr())
 
-    def set_not_after(self, timeptr):
+    def set_not_after(self, asn1_utctime):
         assert m2.x509_type_check(self.x509), "'x509' type error"
-        return m2.x509_set_not_after(self.x509, timeptr )
-
-    def set_pubkey(self, pkey):
-        assert m2.x509_type_check(self.x509), "'x509' type error"
-        return m2.x509_set_pubkey(self.x509, pkey.pkey)
+        return m2.x509_set_not_after(self.x509, asn1_utctime._ptr())
 
     def set_subject_name(self, name):
         assert m2.x509_type_check(self.x509), "'x509' type error"
         return m2.x509_set_subject_name(self.x509, name.x509_name)
 
-    def set_issuer_name(self, x509NamePtr):
+    def set_issuer_name(self, name):
         assert m2.x509_type_check(self.x509), "'x509' type error"
-        return m2.x509_set_issuer_name(self.x509, x509NamePtr)
+        return m2.x509_set_issuer_name(self.x509, name.x509_name)
 
     def get_version(self):
         assert m2.x509_type_check(self.x509), "'x509' type error"
@@ -347,7 +348,7 @@ class X509:
 
     def get_pubkey(self):
         assert m2.x509_type_check(self.x509), "'x509' type error"
-        return m2.x509_get_pubkey(self.x509)
+        return EVP.PKey(m2.x509_get_pubkey(self.x509), _pyfree=1)
 
     def set_pubkey(self, pkey):
         """
@@ -410,6 +411,8 @@ class X509:
             if ext.get_name() == name:
                 return ext
 
+        raise LookupError
+
     def get_ext_at(self, index):
         """
         Get X509 extension by index.
@@ -449,15 +452,28 @@ class X509:
     def verify(self, pkey=None):
         assert m2.x509_type_check(self.x509), "'x509' type error"
         if pkey:
-            return m2.x509_verify(self.x509, pkey)
+            return m2.x509_verify(self.x509, pkey.pkey)
         else:
             return m2.x509_verify(self.x509, m2.x509_get_pubkey(self.x509))
-
-    def as_text(self):
-        assert m2.x509_type_check(self.x509), "'x509' type error"
-        buf = BIO.MemoryBuffer()
-        m2.x509_print( buf.bio_ptr(), self.x509 )
-        return buf.read_all()
+            
+    def check_ca(self):
+        """
+        Check if the certificate is a Certificate Authority (CA) certificate.
+        
+        @return: 0 if the certificate is not CA, nonzero otherwise.
+        """
+        #return m2.x509_check_ca(self.x509)
+        raise NotImplementedError
+        
+    def check_purpose(self, id, ca):
+        """
+        Check if the certificate's purpose matches the asked purpose.
+        
+        @param id: Purpose id. See X509_PURPOSE_* constants.
+        @param ca: 1 if the certificate should be CA, 0 otherwise.
+        @return: 0 if the certificate purpose does not match, nonzero otherwise.
+        """
+        return m2.x509_check_purpose(self.x509, id, ca)
 
 
 def load_cert(file):
@@ -491,10 +507,34 @@ class X509_Store_Context:
         self.ctx = x509_store_ctx
         self._pyfree = _pyfree
 
-    #def __del__(self):
-    # XXX verify this method
-    #    m2.x509_store_ctx_cleanup(self.ctx)
+    def __del__(self):
+        if self._pyfree:
+            m2.x509_store_ctx_free(self.ctx)
+            
+    def _ptr(self):
+        return self.ctx
+            
+    def get_current_cert(self):
+        """
+        Get current X.509 certificate.
+        
+        @warning: The returned certificate is NOT refcounted, so you can not
+        rely on it being valid once the store context goes away or is modified.
+        """
+        return X509(m2.x509_store_ctx_get_current_cert(self.ctx), _pyfree=0)
 
+    def get_error(self):
+        """
+        Get error code.
+        """
+        return m2.x509_store_ctx_get_error(self.ctx)
+        
+    def get_error_depth(self):
+        """
+        Get error depth.
+        """
+        return m2.x509_store_ctx_get_error_depth(self.ctx)
+        
 
 class X509_Store:
     """
@@ -523,6 +563,8 @@ class X509_Store:
     def add_x509(self, x509):
         assert isinstance(x509, X509)
         return m2.x509_store_add_cert(self.store, x509._ptr())
+        
+    add_cert = add_x509
 
 
 class X509_Stack:
@@ -560,6 +602,7 @@ class X509_Stack:
         return m2.sk_x509_push(self.stack, x509._ptr())
 
     def pop(self):
+        # See also X509_Extension_Stack. This method should return something.
         x509_ptr = m2.sk_x509_pop(self.stack)
         del self._refkeeper[x509_ptr]
 
@@ -601,7 +644,7 @@ class Request:
         @rtype:      EVP_PKEY
         @return:     Public key from the request.
         """
-        return m2.x509_req_get_pubkey(self.req)
+        return EVP.PKey(m2.x509_req_get_pubkey(self.req), _pyfree=1)
 
     def set_pubkey(self, pkey):
         """
@@ -657,7 +700,7 @@ class Request:
         return m2.x509_req_add_extensions(self.req, ext_stack._ptr())
 
     def verify(self, pkey):
-        return m2.x509_req_verify(self.req, pkey)
+        return m2.x509_req_verify(self.req, pkey.pkey)
 
     def sign(self, pkey, md):
         mda = getattr(m2, md)

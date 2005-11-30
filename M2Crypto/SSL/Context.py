@@ -2,11 +2,11 @@
 
 Copyright (c) 1999-2004 Ng Pheng Siong. All rights reserved."""
 
-RCS_id='$Id: Context.py,v 1.11 2004/04/09 16:25:24 ngps Exp $'
+RCS_id='$Id$'
 
 # M2Crypto
 import cb
-from M2Crypto import util, BIO, Err, RSA, m2
+from M2Crypto import util, BIO, Err, RSA, m2, X509
 
 class _ctxmap:
     singleton = None
@@ -114,9 +114,8 @@ class Context:
         'capath'    - Directory containing PEM-encoded CA certificates
         (one certificate per file).
         """
-        #assert not (cafile is None and capath is None), "cafile and capath are None."
-        assert not (cafile is None), "cafile is None."
-        return m2.ssl_ctx_load_verify_locations(self.ctx, cafile, capath or '')
+        assert not (cafile is None and capath is None), "cafile and capath are None."
+        return m2.ssl_ctx_load_verify_locations(self.ctx, cafile, capath)
 
     # Deprecated.
     load_verify_info = load_verify_locations
@@ -183,7 +182,13 @@ class Context:
             m2.ssl_ctx_set_tmp_rsa_callback(self.ctx, callback) 
 
     def set_info_callback(self, callback=cb.ssl_info_callback):
-        # XXX Has problem with Python threading...
+        """
+        Set a callback function that can be used to get state information
+        about the SSL connections that are created from this context.
+        
+        @param callback: Callback function. The default prints information to
+                         stderr.
+        """
         m2.ssl_ctx_set_info_callback(self.ctx, callback) 
 
     def set_cipher_list(self, cipher_list):
@@ -209,3 +214,13 @@ class Context:
 
     def set_options(self, op):
         return m2.ssl_ctx_set_options(self.ctx, op)
+
+    def get_cert_store(self):
+        """
+        Get the certificate store associated with this context.
+        
+        @warning: The store is NOT refcounted, and as such can not be relied
+        to be valid once the context goes away or is changed.
+        """
+        return X509.X509_Store(m2.ssl_ctx_get_cert_store(self.ctx))
+    
